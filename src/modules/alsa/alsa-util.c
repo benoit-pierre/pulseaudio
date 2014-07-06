@@ -259,6 +259,7 @@ int pa_alsa_set_hw_params(
     if (!pa_alsa_pcm_is_hw(pcm_handle))
         _use_tsched = false;
 
+#if 0
     /* The PCM pointer is only updated with period granularity */
     if (snd_pcm_hw_params_is_batch(hwparams)) {
         bool is_usb = false;
@@ -281,6 +282,7 @@ int pa_alsa_set_hw_params(
             _use_tsched = false;
         }
     }
+#endif
 
 #if (SND_LIB_VERSION >= ((1<<16)|(0<<8)|24)) /* API additions in 1.0.24 */
     if (_use_tsched) {
