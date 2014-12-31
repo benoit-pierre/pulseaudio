@@ -87,7 +87,6 @@ struct pa_socket_server {
     pa_io_event *io_event;
     pa_mainloop_api *mainloop;
     enum {
-        SOCKET_SERVER_GENERIC,
         SOCKET_SERVER_IPV4,
         SOCKET_SERVER_UNIX,
         SOCKET_SERVER_IPV6
@@ -149,7 +148,7 @@ finish:
     pa_socket_server_unref(s);
 }
 
-pa_socket_server* pa_socket_server_new(pa_mainloop_api *m, int fd) {
+static pa_socket_server* socket_server_new(pa_mainloop_api *m, int fd) {
     pa_socket_server *s;
 
     pa_assert(m);
@@ -161,8 +160,6 @@ pa_socket_server* pa_socket_server_new(pa_mainloop_api *m, int fd) {
     s->mainloop = m;
 
     pa_assert_se(s->io_event = m->io_new(m, fd, PA_IO_EVENT_INPUT, callback, s));
-
-    s->type = SOCKET_SERVER_GENERIC;
 
     return s;
 }
@@ -231,7 +228,7 @@ pa_socket_server* pa_socket_server_new_unix(pa_mainloop_api *m, const char *file
         }
     }
 
-    pa_assert_se(s = pa_socket_server_new(m, fd));
+    pa_assert_se(s = socket_server_new(m, fd));
 
     s->filename = pa_xstrdup(filename);
     s->type = SOCKET_SERVER_UNIX;
@@ -300,7 +297,7 @@ pa_socket_server* pa_socket_server_new_ipv4(pa_mainloop_api *m, uint32_t address
         goto fail;
     }
 
-    pa_assert_se(ss = pa_socket_server_new(m, fd));
+    pa_assert_se(ss = socket_server_new(m, fd));
 
     ss->type = SOCKET_SERVER_IPV4;
     ss->tcpwrap_service = pa_xstrdup(tcpwrap_service);
@@ -368,7 +365,7 @@ pa_socket_server* pa_socket_server_new_ipv6(pa_mainloop_api *m, const uint8_t ad
         goto fail;
     }
 
-    pa_assert_se(ss = pa_socket_server_new(m, fd));
+    pa_assert_se(ss = socket_server_new(m, fd));
 
     ss->type = SOCKET_SERVER_IPV6;
     ss->tcpwrap_service = pa_xstrdup(tcpwrap_service);
