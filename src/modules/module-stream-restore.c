@@ -63,6 +63,7 @@ PA_MODULE_DESCRIPTION("Automatically restore the volume/mute/device state of str
 PA_MODULE_VERSION(PACKAGE_VERSION);
 PA_MODULE_LOAD_ONCE(true);
 PA_MODULE_USAGE(
+        "fallback_volume=<Fallback default volume?> "
         "restore_device=<Save/restore sinks/sources?> "
         "restore_volume=<Save/restore volumes?> "
         "restore_muted=<Save/restore muted states?> "
@@ -79,6 +80,7 @@ PA_MODULE_USAGE(
 #define WHITESPACE "\n\r \t"
 
 static const char* const valid_modargs[] = {
+    "fallback_volume",
     "restore_device",
     "restore_volume",
     "restore_muted",
@@ -105,6 +107,7 @@ struct userdata {
     pa_time_event *save_time_event;
     pa_database* database;
 
+    pa_volume_t fallback_volume;
     bool restore_device:1;
     bool restore_volume:1;
     bool restore_muted:1;
@@ -1494,6 +1497,23 @@ static pa_hook_result_t sink_input_fixate_hook_callback(pa_core *c, pa_sink_inpu
         }
 
         entry_free(e);
+    } else if (PA_VOLUME_INVALID != u->fallback_volume) {
+        if (!new_data->volume_writable)
+            pa_log_debug("Not setting fallback volume for sink input %s, because its volume can't be changed.", name);
+        else if (new_data->volume_is_set)
+            pa_log_debug("Not setting fallback volume for sink input %s, because already set.", name);
+        else {
+            pa_cvolume v;
+
+            pa_log_info("Setting fallback volume for sink input %s.", name);
+
+            for (v.channels = 0; v.channels < new_data->volume.channels; ++v.channels)
+                v.values[v.channels] = u->fallback_volume;
+            pa_sink_input_new_data_set_volume(new_data, &v);
+
+            new_data->volume_is_absolute = false;
+            new_data->save_volume = true;
+        }
     }
 
     pa_xfree(name);
@@ -2359,6 +2379,7 @@ int pa__init(pa_module*m) {
     pa_sink_input *si;
     pa_source_output *so;
     uint32_t idx;
+    pa_volume_t fallback_volume = PA_VOLUME_INVALID;
     bool restore_device = true, restore_volume = true, restore_muted = true, on_hotplug = true, on_rescue = true;
 #ifdef HAVE_DBUS
     pa_datum key;
@@ -2372,7 +2393,8 @@ int pa__init(pa_module*m) {
         goto fail;
     }
 
-    if (pa_modargs_get_value_boolean(ma, "restore_device", &restore_device) < 0 ||
+    if (pa_modargs_get_value_volume(ma, "fallback_volume", &fallback_volume) < 0 ||
+        pa_modargs_get_value_boolean(ma, "restore_device", &restore_device) < 0 ||
         pa_modargs_get_value_boolean(ma, "restore_volume", &restore_volume) < 0 ||
         pa_modargs_get_value_boolean(ma, "restore_muted", &restore_muted) < 0 ||
         pa_modargs_get_value_boolean(ma, "on_hotplug", &on_hotplug) < 0 ||
@@ -2387,6 +2409,7 @@ int pa__init(pa_module*m) {
     m->userdata = u = pa_xnew0(struct userdata, 1);
     u->core = m->core;
     u->module = m;
+    u->fallback_volume = fallback_volume;
     u->restore_device = restore_device;
     u->restore_volume = restore_volume;
     u->restore_muted = restore_muted;
